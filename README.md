@@ -1,5 +1,7 @@
 # HuStdLookupSdk
 
+![HuStdLookupSdk header](src/HuSdt.png)
+
 > A simple and fast tool to find student and dorm room information for Haramaya University.
 
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
