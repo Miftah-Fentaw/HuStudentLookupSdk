@@ -389,15 +389,10 @@ npm test
 
 ## Contributing
 
-Contributions are always welcome:
-
-1. Fork the repository on GitHub.
-2. Create your own feature branch (`git checkout -b feature/your-feature-name`).
-3. Commit your changes and push to your branch.
-4. Send a Pull Request!
+Contributions are always welcome. See the [contribution guide](CONTRIBUTING.md) for setup, tests, and pull requests.
 
 ---
 
 ## License
 
-MIT
+This project is licensed under the [MIT License](LICENSE).
