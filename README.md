@@ -17,9 +17,15 @@ It comes with all student data built-in, works completely offline without any in
 ## What It Can Do
 
 - Find by ID: Look up any student quickly with their ID. It does not care about extra spaces, capital letters, or if you add "UGPR" at the front (for example, `"UGPR0276/15"` and `"0276/15"` both work).
+- Batch Lookup: Resolve many IDs at once with `getByIds`.
+- Validate IDs: Check and normalize an ID for forms with `validateId`.
 - Search by Name: Type one or more parts of a name to find students (for example, typing `"dagim alemu"` finds `"Dagim Alemu Alolo"`).
+- Fuzzy Name Search (opt-in): Allow small typos with `fuzzy: true` without changing default search speed.
+- Autocomplete: Suggest students or campus/department values as the user types with `suggest`.
 - Filter by Category: Find students by gender, department, campus, building, dorm room, or year.
 - Search Multiple Things at Once: Search across multiple campuses or departments by passing a list (for example, `['Main', 'Hit']`).
+- Sort and Page: Sort by field and use `page` / `pageSize` for tables.
+- Stats for Charts: Group and count students with `stats({ groupBy })`.
 - Find Roommates: Get full details for all students who share the same dorm room.
 - Count Options for Dropdowns: Get a list of all campus or department names and how many students are in each, perfect for dropdown menus.
 - Split Results into Pages: Show results in small pages so your website stays fast.
@@ -323,6 +329,34 @@ console.log(`Total departments available: ${departments.length}`);
 
 ---
 
+### 7. Batch Lookup, Validate, Suggest, Fuzzy Search, and Stats
+
+```javascript
+// Many IDs at once (same order; missing IDs are null):
+sdk.getByIds(['0276/15', 'UGPR1228/18', 'nope']);
+
+// Forms / bots:
+sdk.validateId('  UGPR0276/15 ');
+// { ok: true, normalized: '0276/15', reason: null, student: { ... } }
+
+// Autocomplete for a search box:
+sdk.suggest('dagim alemu', { limit: 8 });
+sdk.suggest('ma', { field: 'campus', limit: 5 });
+
+// Default name search stays exact prefix. Fuzzy is opt-in only:
+sdk.search({ name: 'dagm alemu' });                 // no match
+sdk.search({ name: 'dagm alemu', fuzzy: true });    // finds Dagim Alemu Alolo
+
+// Sort + page helpers (default name A-Z is unchanged when sortBy is omitted):
+sdk.search({ campus: 'Hit', sortBy: 'dept', sortDir: 'asc', page: 2, pageSize: 20 });
+
+// Charts / dashboards:
+sdk.stats({ groupBy: 'campus' });
+sdk.stats({ groupBy: ['campus', 'sex'], campus: 'Hit' });
+```
+
+---
+
 ## Reference Guide
 
 ### Functions and Methods
@@ -333,20 +367,41 @@ console.log(`Total departments available: ${departments.length}`);
 - `sdk.getById(id)`
   Finds a single student by their ID number. Returns the student object, or `null` if not found.
 
+- `sdk.getByIds(ids)`
+  Batch lookup. Returns one entry per input id (student object or `null`), in the same order.
+
+- `sdk.validateId(id)`
+  Normalizes and checks an ID. Returns `{ ok, input, normalized, reason, student }`.
+  `reason` is `'empty'`, `'invalid_format'`, `'not_found'`, or `null` when valid.
+
 - `sdk.getDormmates(id)`
   Finds all students who share the same dorm room with the given student ID. Returns a list of student objects (excluding the student themselves).
 
 - `sdk.search(options)`
   Searches students by name or filters. You can pass:
-  - `name`: Text to match in the student name.
+  - `name`: Text to match in the student name (prefix by default).
+  - `fuzzy`: Opt-in typo tolerance for `name` (default `false`; existing callers stay fast).
+  - `maxEdits`: Max edit distance when `fuzzy` is true (default `1`, max `2`).
   - `sex`: `'M'` or `'F'`.
   - `dept`: Department code (like `'SWE'`, `'Meng'`).
   - `campus`: Campus name (like `'Main'`, `'Hit'`, `'Harar'`, `'VET'`).
   - `building`: Dorm building name (like `'SAT 4A'`, `'Block LA'`).
   - `dorm`: Dorm room number (like `'120'`, `'44'`).
   - `year`: Academic year (like `'1st'`, `'2nd'`, `'5th'`).
+  - `sortBy`: Optional sort field (`name`, `id`, `sex`, `dept`, `campus`, `building`, `year`, `dorm`).
+  - `sortDir`: `'asc'` (default) or `'desc'`.
   - `limit`: Maximum number of results to return (default is 50).
   - `offset`: Number of results to skip for pages (default is 0).
+  - `page` / `pageSize`: Optional 1-based paging helpers (set `offset` / `limit` for you).
+
+- `sdk.suggest(query, options?)`
+  Autocomplete helper. By default returns matching students by name prefix.
+  Pass `{ field: 'campus' }` (or another filter field) to suggest facet values.
+  Supports `{ limit, fuzzy, maxEdits }`.
+
+- `sdk.stats(options)`
+  Groups and counts students. Requires `groupBy` (string or array of filter fields).
+  Accepts the same filters as `search` (including optional `name` / `fuzzy`).
 
 - `sdk.facets(fieldName)`
   Returns a list of all unique values and counts for that field (for example, `'campus'` or `'dept'`).
