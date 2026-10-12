@@ -107,3 +107,78 @@ test('lookups and roommates for Dagim Alemu and Elbetel Taye match expected data
   assert.strictEqual(elbetelMates.length, 5);
   assert.ok(elbetelMates.every((m) => m.dorm === '44' && m.building === 'Block LA'));
 });
+
+test('getByIds returns records or null in the same order', () => {
+  const rows = sdk.getByIds(['0276/15', 'UGPR1228/18', 'nope', ' 1175/15 ']);
+  assert.strictEqual(rows.length, 4);
+  assert.strictEqual(rows[0].name, 'Dagim Alemu Alolo');
+  assert.strictEqual(rows[1].name, 'Elbetel Taye Ladankilet');
+  assert.strictEqual(rows[2], null);
+  assert.strictEqual(rows[3].name, 'Adane Absaye Ayle');
+  assert.deepStrictEqual(sdk.getByIds('not-an-array'), []);
+});
+
+test('validateId normalizes input and reports clear reasons', () => {
+  const ok = sdk.validateId('  UGPR0276/15 ');
+  assert.strictEqual(ok.ok, true);
+  assert.strictEqual(ok.normalized, '0276/15');
+  assert.strictEqual(ok.reason, null);
+  assert.strictEqual(ok.student.name, 'Dagim Alemu Alolo');
+
+  assert.strictEqual(sdk.validateId('').reason, 'empty');
+  assert.strictEqual(sdk.validateId('not-an-id').reason, 'invalid_format');
+  assert.strictEqual(sdk.validateId('9999/99').reason, 'not_found');
+});
+
+test('default search ignores typos; fuzzy opt-in finds them', () => {
+  assert.deepStrictEqual(sdk.search({ name: 'dagm alemu' }), { total: 0, results: [] });
+  const fuzzy = sdk.search({ name: 'dagm alemu', fuzzy: true });
+  assert.ok(fuzzy.total >= 1);
+  assert.ok(fuzzy.results.some((r) => r.id === '0276/15'));
+});
+
+test('search sortBy and page do not change default name order', () => {
+  const plain = sdk.search({ campus: 'VET', limit: 5 });
+  const explicit = sdk.search({ campus: 'VET', sortBy: 'name', sortDir: 'asc', limit: 5 });
+  assert.deepStrictEqual(explicit.results.map((r) => r.id), plain.results.map((r) => r.id));
+
+  const byDept = sdk.search({ campus: 'VET', sortBy: 'dept', sortDir: 'asc', limit: 20 });
+  for (let i = 1; i < byDept.results.length; i++) {
+    assert.ok(byDept.results[i - 1].dept.localeCompare(byDept.results[i].dept, undefined, { sensitivity: 'base' }) <= 0);
+  }
+
+  const page1 = sdk.search({ campus: 'Hit', page: 1, pageSize: 3 });
+  const page2 = sdk.search({ campus: 'Hit', page: 2, pageSize: 3 });
+  assert.strictEqual(page1.results.length, 3);
+  assert.strictEqual(page2.results.length, 3);
+  assert.notStrictEqual(page1.results[0].id, page2.results[0].id);
+  assert.strictEqual(page1.total, page2.total);
+});
+
+test('suggest returns name prefix matches and campus facets', () => {
+  const names = sdk.suggest('dagim alemu', { limit: 5 });
+  assert.ok(names.length >= 1);
+  assert.ok(names.some((r) => r.id === '0276/15'));
+  assert.ok(names.length <= 5);
+
+  const campuses = sdk.suggest('ma', { field: 'campus', limit: 5 });
+  assert.ok(campuses.some((c) => /main/i.test(c.value)));
+});
+
+test('stats groups counts and respects filters', () => {
+  const byCampus = sdk.stats({ groupBy: 'campus' });
+  assert.ok(byCampus.length >= 4);
+  const main = byCampus.find((r) => r.campus === 'Main');
+  assert.ok(main && main.count > 0);
+  assert.strictEqual(
+    byCampus.reduce((n, r) => n + r.count, 0),
+    sdk.size
+  );
+
+  const filtered = sdk.stats({ groupBy: ['campus', 'sex'], campus: 'Hit' });
+  assert.ok(filtered.every((r) => r.campus === 'Hit'));
+  assert.strictEqual(
+    filtered.reduce((n, r) => n + r.count, 0),
+    sdk.search({ campus: 'Hit', limit: 1 }).total
+  );
+});
